@@ -55,46 +55,64 @@ export default function AdminLayout() {
     return `${d}d`;
   };
 
-  const mapNotification = (n) => {
-    const booking = n.booking || {};
-    const room = booking.room || {};
-    const guest = n.guest || booking.user || {};
+const mapNotification = (n) => {
+  const booking = n.booking || {};
+  // Fix: Handle rooms array properly
+  const rooms = booking.rooms || [];
+  const guest = n.guest || booking.user || {};
 
-    const title = n.title || "Notification";
-    const lower = title.toLowerCase();
+  const title = n.title || "Notification";
+  const lower = title.toLowerCase();
 
-    let type = "booking";
-    let status = "info";
+  let type = "booking";
+  let status = "info";
 
-    if (lower.includes("payment")) {
-      type = "payment";
-      status = "success";
-    } else if (lower.includes("checked in") || lower.includes("checked out")) {
-      type = "booking";
-      status = "success";
-    } else if (lower.includes("cancel")) {
-      type = "booking";
-      status = "warning";
+  if (lower.includes("payment")) {
+    type = "payment";
+    status = "success";
+  } else if (lower.includes("checked in") || lower.includes("checked out")) {
+    type = "booking";
+    status = "success";
+  } else if (lower.includes("cancel")) {
+    type = "booking";
+    status = "warning";
+  }
+
+  const msg = n.message || "";
+  const m = msg.match(/Guest:\s*(.+)/);
+  const msgName = m ? m[1].split("\n")[0].trim() : "";
+
+  // Fix: Safely access room details
+  let roomName = "N/A";
+  let roomNumber = "N/A";
+  
+  if (rooms.length > 0) {
+    const roomData = rooms[0];
+    // Check if room is populated (object) or just an ID
+    if (roomData.room && typeof roomData.room === 'object') {
+      roomName = roomData.room.name || "N/A";
+      roomNumber = roomData.room.roomNumber || "N/A";
+    } else if (roomData.room && typeof roomData.room === 'string') {
+      // If room is just an ID, we can't show name
+      roomName = "Room ID: " + roomData.room.substring(0, 8);
+      roomNumber = "N/A";
     }
+  }
+  
+  // Format room line properly
+  const roomLine = roomName !== "N/A" 
+    ? `Room: ${roomName} (${roomNumber})`
+    : roomNumber !== "N/A" 
+      ? `Room: ${roomNumber}`
+      : "Room: Not assigned";
 
-    const msg = n.message || "";
-    const m = msg.match(/Guest:\s*(.+)/);
-    const msgName = m ? m[1].split("\n")[0].trim() : "";
+  const fullName = `${guest.firstName || ""} ${guest.lastName || ""}`.trim();
+  const guestName =
+    fullName && fullName !== ""
+      ? fullName
+      : guest.name || "" || msgName || "N/A";
 
-    const roomName = room.name || "";
-    const roomNumber = room.roomNumber || "N/A";
-    const roomLine =
-      roomName && String(roomName) !== String(roomNumber)
-        ? `Room: ${roomName} (${roomNumber})`
-        : `Room: ${roomNumber}`;
-
-    const fullName = `${guest.firstName || ""} ${guest.lastName || ""}`.trim();
-    const guestName =
-      fullName && fullName !== ""
-        ? fullName
-        : guest.name || "" || msgName || "N/A";
-
-    const formattedDesc = `
+  const formattedDesc = `
 ${roomLine}
 Guest: ${guestName}
 
@@ -104,37 +122,40 @@ Paid: ₹${booking.paidAmount || 0} / ₹${booking.totalAmount || 0}
 Remaining: ₹${booking.pendingAmount || 0}
 `.trim();
 
-    return {
-      type,
-      title: n.title,
-      desc: formattedDesc,
-      time: toRelative(n.createdAt),
-      status,
-      unread: !n.isRead,
-      id: n._id || n.id,
-      bookingId: n.booking,
-    };
+  return {
+    type,
+    title: n.title,
+    desc: formattedDesc,
+    time: toRelative(n.createdAt),
+    status,
+    unread: !n.isRead,
+    id: n._id || n.id,
+    bookingId: n.booking,
+    rooms: rooms,
+  };
+};
+
+useEffect(() => {
+  let timer;
+  const token = localStorage.getItem("token");
+  const headers = token ? { Authorization: `Bearer ${token}` } : {};
+
+  const fetchNotifications = async () => {
+    try {
+      const { data } = await api.get("/notification", { headers });
+      console.log("Raw notification data:", data); // Debug log
+      const list = (data?.data || []).map(mapNotification);
+      console.log("Mapped notifications:", list); // Debug log
+      setNotifications(list);
+    } catch (error) {
+      console.error("Failed to fetch notifications:", error);
+    }
   };
 
-  useEffect(() => {
-    let timer;
-    const token = localStorage.getItem("token");
-    const headers = token ? { Authorization: `Bearer ${token}` } : {};
-
-    const fetchNotifications = async () => {
-      try {
-        const { data } = await api.get("/notification", { headers });
-        const list = (data?.data || []).map(mapNotification);
-        setNotifications(list);
-      } catch (error) {
-        console.error("Failed to fetch notifications:", error);
-      }
-    };
-
-    fetchNotifications();
-    timer = setInterval(fetchNotifications, 15000);
-    return () => clearInterval(timer);
-  }, []);
+  fetchNotifications();
+  timer = setInterval(fetchNotifications, 15000);
+  return () => clearInterval(timer);
+}, []);
 
   const deleteNotification = async (id) => {
     try {
@@ -445,28 +466,27 @@ Remaining: ₹${booking.pendingAmount || 0}
                                 >
                                   <IconComp size={16} />
                                 </div>
-                                <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-2">
-                                    <span
-                                      className={`text-sm text-primary truncate ${n.unread ? "font-extrabold" : "font-light"}`}
-                                    >
-                                      {n.title}
-                                    </span>
-                                    {n.unread && (
-                                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-500 text-white">
-                                        New
-                                      </span>
-                                    )}
-                                  </div>
-                                  <div
-                                    className={`text-[12px] mt-0.5 truncate ${n.unread ? "text-gray-800 font-medium" : "text-gray-600"}`}
-                                  >
-                                    {n.desc}
-                                  </div>
-                                  <div className="text-[11px] text-gray-400 mt-1">
-                                    {n.time}
-                                  </div>
-                                </div>
+
+                                
+                               <div className="flex-1 min-w-0">
+  <div className="flex items-center gap-2">
+    <span className={`text-sm text-primary truncate ${n.unread ? "font-extrabold" : "font-light"}`}>
+      {n.title}
+    </span>
+    {n.unread && (
+      <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-500 text-white">
+        New
+      </span>
+    )}
+  </div>
+  <div className={`text-[12px] mt-0.5 truncate ${n.unread ? "text-gray-800 font-medium" : "text-gray-600"}`}>
+    {/* The desc already contains formatted room info */}
+    {n.desc.split('\n')[0]} {/* Shows just the first line (room info) */}
+  </div>
+  <div className="text-[11px] text-gray-400 mt-1">
+    {n.time}
+  </div>
+</div>
                               </Motion.div>
                             );
                           })}

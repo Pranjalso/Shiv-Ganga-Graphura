@@ -418,14 +418,17 @@ const Sidebar = ({ children }) => {
                     //     selectedNotification.booking.paidAmount}
                     // </>
                     <>
-                      <p>
-                        <b>Room:</b>{" "}
-                        {selectedNotification.booking.rooms
-                          ?.map(
-                            (r) => `${r.room?.name || "N/A"} (${r.room?.roomNumber || "N/A"})`
-                          )
-                          .join(", ")}
-                      </p>
+                     <p>
+  <b>Room:</b>{" "}
+  {selectedNotification.booking.rooms && selectedNotification.booking.rooms.length > 0
+    ? selectedNotification.booking.rooms
+        .filter(r => r.room) // Filter out rooms that aren't populated
+        .map(
+          (r) => `${r.room?.name || "Room"} (${r.room?.roomNumber || "N/A"})`
+        )
+        .join(", ")
+    : "Room not assigned"}
+</p>
 
                       <p>
                         <b>Guest:</b>{" "}
@@ -451,12 +454,13 @@ const Sidebar = ({ children }) => {
                         {selectedNotification.booking.totalAmount}
                       </p>
 
-                      <p>
-                        <b>Remaining:</b> ₹
-                        {selectedNotification.booking.totalAmount -
-                          selectedNotification.booking.paidAmount - selectedNotification.booking.membershipDiscount
-                        }
-                      </p>
+                     <p>
+  <b>Remaining:</b> ₹
+  {Math.max(0, selectedNotification.booking.totalAmount - 
+    selectedNotification.booking.paidAmount - 
+    (selectedNotification.booking.membershipDiscount || 0)
+  )}
+</p>
                       {/* <p>
                         <b>Membership Discount:</b> ₹
                         {selectedNotification.booking.membershipDiscount
@@ -651,11 +655,11 @@ const Sidebar = ({ children }) => {
                             </span>
                           </div>
 
-                          <p className="text-xs text-slate-500 mt-1 line-clamp-2">
-                            {notif.booking
-                              ? `${notif.booking.room?.name} - ${notif.booking.bookingStatus} - ${notif.booking.paymentStatus}`
-                              : notif.message}
-                          </p>
+                        <p className="text-xs text-slate-500 mt-1 line-clamp-2">
+  {notif.booking && notif.booking.rooms && notif.booking.rooms.length > 0
+    ? `${notif.booking.rooms.map(r => r.room?.name || "Room").join(", ")} - ${notif.booking.bookingStatus || "confirmed"} - ${notif.booking.paymentStatus || "paid"}`
+    : notif.message}
+</p>
                         </div>
                       </div>
                     ))}

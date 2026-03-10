@@ -9,9 +9,7 @@ export const getReceptionistNotifications = async (req, res) => {
       .populate({
         path: "booking",
         populate: [
-          // FIX: was { path: "room", model: "Room" } — booking has no singular "room" field
-          // Must populate the nested rooms.room path instead
-          { path: "rooms.room", model: "Room" },
+          { path: "rooms.room", model: "Room" }, // This is correct for nested rooms
           { path: "user", model: "User" },
         ],
       })
